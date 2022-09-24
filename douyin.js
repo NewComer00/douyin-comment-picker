@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音评论筛选器 | Douyin Comment Picker
 // @namespace    https://github.com/NewComer00
-// @version      0.1.0
+// @version      0.1.1
 // @description  筛选包含给定关键词的抖音评论 | Pick out the comments including the given keywords in Douyin.
 // @author       NewComer00
 // @match        https://www.douyin.com/*
@@ -17,7 +17,7 @@
     // ========================================================================
     // 使用说明
     //
-    // v0.1.0
+    // v0.1.1
     // 在Tampermonkey中修改“脚本输入参数”，Ctrl+S保存修改。
     // 使能该脚本，然后访问抖音官网，按下F12进入Console即可。
     // 脚本运行中如被打断，刷新即可继续运行。脚本的Cookie文件会保存一天时间。一天之内都可以再次从断点开始。
@@ -39,7 +39,7 @@
     const KEYWORDS = ['ToSsGirL', '西湖', '大哥', 'F91'];
 
     // 只筛选前几个视频，应当是非负整数
-    const MAX_VIDEO_NUM = 2;
+    const MAX_VIDEO_NUM = 5;
 
     // ========================================================================
     // 相关数据类型和函数
@@ -54,20 +54,20 @@
     // 下载数据至本地文件
     // https://stackoverflow.com/a/30832210
     function download(data, filename, type) {
-        var file = new Blob([data], {type: type});
+        var file = new Blob([data], { type: type });
         if (window.navigator.msSaveOrOpenBlob) // IE10+
             window.navigator.msSaveOrOpenBlob(file, filename);
         else { // Others
             var a = document.createElement("a"),
-                    url = URL.createObjectURL(file);
+                url = URL.createObjectURL(file);
             a.href = url;
             a.download = filename;
             document.body.appendChild(a);
             a.click();
-            setTimeout(function() {
+            setTimeout(function () {
                 document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);  
-            }, 0); 
+                window.URL.revokeObjectURL(url);
+            }, 0);
         }
     }
 
@@ -145,7 +145,10 @@
         // 状态一。获取关键词对应的所有视频编号
         case State.One:
             console.log("正在获取关键词对应的所有视频编号...");
-            window.onload = function () {
+            // setTimeout等待几秒，以确保网页真的已经完成加载
+            // TODO: 为什么onload被触发时页面却没有加载完全？反爬虫机制？
+            console.log("确保页面真的完全加载，请等待...");
+            window.onload = setTimeout(function () {
                 const bodyText = document.getElementsByTagName("body")[0].innerHTML;
                 const rgx = new RegExp(
                     strFormat(String.raw`href="\/\/%s\/video\/(\d+)" class`, DOMAIN), 'g');
@@ -175,7 +178,7 @@
                     Cookies.set('State', String(State.Original), { domain: DOMAIN, expires: 1 });
                     curState = State.Original;
                 }
-            }
+            }, 5000);
             break;
 
         // 状态二。处理每个编号的视频
