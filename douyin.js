@@ -8,7 +8,7 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=google.com
 // @grant        none
 // @require      https://cdn.jsdelivr.net/npm/js-cookie@3.0.1/dist/js.cookie.min.js
-// @license      GPLv2
+// @license      GPLv2 AND Commercial use prohibited | GPLv2且禁止商用
 // ==/UserScript==
 
 (function () {
