@@ -17,18 +17,19 @@
     // ========================================================================
     // 使用说明
     //
-    // v0.1
-    // 在Tampermonkey中修改“脚本输入参数”中的“视频关键词”和“评论关键词”，Ctrl+S保存修改。
+    // v0.1.0
+    // 在Tampermonkey中修改“脚本输入参数”，Ctrl+S保存修改。
     // 使能该脚本，然后访问抖音官网，按下F12进入Console即可。
     // 脚本运行中如被打断，刷新即可继续运行。脚本的Cookie文件会保存一天时间。一天之内都可以再次从断点开始。
     // 如中途需要从头执行脚本，请先删除浏览器Cookie，然后刷新抖音页面即可。
+    // 执行完毕后，网页会弹出结果文件下载窗口。复制文件中所有内容，粘贴到Excel即可以表格方式查看。
     // ========================================================================
 
     // ========================================================================
     // 脚本输入参数
     // ========================================================================
 
-    // 网站域名。目前只适用于抖音 
+    // 网站域名。目前只适用于抖音
     const DOMAIN = 'www.douyin.com';
 
     // 视频关键词
@@ -36,6 +37,9 @@
 
     // 视频下的评论关键词
     const KEYWORDS = ['ToSsGirL', '西湖', '大哥', 'F91'];
+
+    // 只筛选前几个视频，应当是非负整数
+    const MAX_VIDEO_NUM = 2;
 
     // ========================================================================
     // 相关数据类型和函数
@@ -46,6 +50,27 @@
         One: 'One',
         Two: 'Two'
     }
+
+    // 下载数据至本地文件
+    // https://stackoverflow.com/a/30832210
+    function download(data, filename, type) {
+        var file = new Blob([data], {type: type});
+        if (window.navigator.msSaveOrOpenBlob) // IE10+
+            window.navigator.msSaveOrOpenBlob(file, filename);
+        else { // Others
+            var a = document.createElement("a"),
+                    url = URL.createObjectURL(file);
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function() {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);  
+            }, 0); 
+        }
+    }
+
 
     // ========================================================================
     // 分析视频页面的逻辑，可以自定义
@@ -127,6 +152,10 @@
                 let videoIdArr = Array.from(bodyText.matchAll(rgx), m => m[1]);
                 // 去除重复的视频编号
                 videoIdArr = [...new Set(videoIdArr)];
+                // 用户希望选择前多少个视频
+                console.assert(MAX_VIDEO_NUM >= 0, 'MAX_VIDEO_NUM应当是非负整数，否则可能会获取不到视频编号');
+                videoIdArr = videoIdArr.slice(
+                    0, Math.min(videoIdArr.length, Math.floor(MAX_VIDEO_NUM)));
 
                 console.log(strFormat('已提取和“%s”相关的所有视频编号', TARGET));
                 console.log(videoIdArr);
@@ -169,7 +198,7 @@
                     // 添加结果至缓存，若是从头开始运行则覆盖老的缓存
                     let oldResult = Cookies.get('Result');
                     if (typeof oldResult !== 'undefined' && videoCurIndex !== 0) {
-                        result += oldResult;
+                        result = oldResult + result;
                     }
                     Cookies.set('Result', String(result), { domain: DOMAIN, expires: 1 });
 
@@ -188,9 +217,11 @@
                         // 执行完毕正常退出，下次刷新后返回初态
                         let finMsg = strFormat(
                             '【视频主题】\n%s\n【评论关键词】\n%s\n【最终筛选结果】\n%s\n',
-                            TARGET, KEYWORDS, Cookies.get('Result'));
+                            TARGET, KEYWORDS, result);
                         console.log(finMsg);
-                        console.log('脚本运行完成，刷新后将重新运行脚本');
+                        download(result, 'Result', 'text/plain');
+
+                        console.log('脚本运行完成，注意结果文件下载弹窗。刷新后将重新运行脚本');
                         Cookies.set('State', String(State.Original), { domain: DOMAIN, expires: 1 });
                         curState = State.Original;
                     }
