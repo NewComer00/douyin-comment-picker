@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音评论筛选器 | Douyin Comment Picker
 // @namespace    https://github.com/NewComer00
-// @version      0.1.1
+// @version      0.2.0
 // @description  筛选包含给定关键词的抖音评论 | Pick out the comments including the given keywords in Douyin.
 // @author       NewComer00
 // @match        https://www.douyin.com/*
@@ -17,29 +17,21 @@
     // ========================================================================
     // 使用说明
     //
-    // v0.1.1
-    // 在Tampermonkey中修改“脚本输入参数”，Ctrl+S保存修改。
-    // 使能该脚本，然后访问抖音官网，按下F12进入Console即可。
+    // v0.2.0
+    // 将脚本复制添加到Tampermonkey。使能该脚本，然后访问抖音官网，按下F12进入Console即可。
+    // 在页面上方依次填写“视频关键词”“评论筛选关键词（空格隔开）”和“最大浏览视频数量”，然后点击“开始”。
     // 脚本运行中如被打断，刷新即可继续运行。脚本的Cookie文件会保存一天时间。一天之内都可以再次从断点开始。
-    // 如中途需要从头执行脚本，请先删除浏览器Cookie，然后刷新抖音页面即可。
+    // 如中途需要从头执行脚本，请先删除浏览器上抖音网站的Cookie，然后刷新抖音页面即可。
     // 执行完毕后，网页会弹出结果文件下载窗口。复制文件中所有内容，粘贴到Excel即可以表格方式查看。
+    // 如需在脚本运行前排除先前Cookie的影响，可以点击“清除脚本缓存”按钮，然后刷新页面。
     // ========================================================================
 
     // ========================================================================
     // 脚本输入参数
     // ========================================================================
 
-    // 网站域名。目前只适用于抖音
+    // 网站域名。目前只适用于抖音，请不要更改
     const DOMAIN = 'www.douyin.com';
-
-    // 视频关键词
-    const TARGET = '孙一峰';
-
-    // 视频下的评论关键词
-    const KEYWORDS = ['ToSsGirL', '西湖', '大哥', 'F91'];
-
-    // 只筛选前几个视频，应当是非负整数
-    const MAX_VIDEO_NUM = 5;
 
     // ========================================================================
     // 相关数据类型和函数
@@ -129,16 +121,112 @@
         curState = State.Original;
     }
 
-    switch (curState) {
-        // 初态。根据关键词搜索视频
-        case State.Original:
-            console.log("正在根据关键词搜索视频...");
-            Cookies.set('State', String(State.One), { domain: DOMAIN, expires: 1 });
-            curState = State.One;
+    // 检查视频关键词和评论关键词等Cookie是否存在
+    let target = Cookies.get('target'); // 视频关键词
+    let keywords = Cookies.get('keywords'); // 视频下的评论筛选关键词，由空格分开
+    let maxVideoNum = Cookies.get('maxVideoNum'); // 只筛选前几个视频，应当是非负整数
+    if (typeof target === 'undefined' || typeof keywords === 'undefined'
+        || typeof maxVideoNum === 'undefined') {
+        // 除非当前状态在初态，否则这些Cookie都应当存在。不存在则回到初态
+        if (curState !== State.Original) {
+            console.log('没有找到视频关键词和评论关键词等的Cookie缓存文件\n'
+                + '脚本将重置进度，请重新输入这些信息');
+            Cookies.set('State', State.Original, { domain: DOMAIN, expires: 1 });
+            curState = State.Original;
+        }
+    } else {
+        // 代码运行到此处，证明视频关键词等信息都以字符串的形式存在
+        // 将关键信息提取出来变成相应类型的常量，状态机除初态之外的核心逻辑都使用这些常量
+        var TARGET = target; // string
+        var KEYWORDS = keywords.split(' '); // array of string
+        var MAX_VIDEO_NUM = parseInt(maxVideoNum); // int
+    }
 
-            // 重定向至视频搜索结果页面
-            var searchUrl = encodeURI(strFormat('https://%s/search/%s?&type=video', DOMAIN, TARGET));
-            window.location.href = searchUrl;
+    switch (curState) {
+        // 初态。加载脚本的用户交互组件，获取用户输入
+        case State.Original:
+            console.log("请在页面上填写相关筛选信息...");
+
+            // 文本框，输入视频关键词
+            var inputTarget = document.createElement("input");
+            inputTarget.setAttribute('name', "inputTarget");
+            inputTarget.setAttribute('type', "text");
+            inputTarget.setAttribute('placeholder', "视频关键词");
+            if (typeof target !== 'undefined' && target.length !== 0) {
+                inputTarget.setAttribute('value', target);
+            } else {
+                inputTarget.setAttribute('value', '孙一峰');
+            }
+            document.getElementById('douyin-header').appendChild(inputTarget);
+
+            // 文本框，输入视频下的评论筛选关键词
+            var inputKeywords = document.createElement("input");
+            inputKeywords.setAttribute('name', "inputKeywords");
+            inputKeywords.setAttribute('type', "text");
+            inputKeywords.setAttribute('placeholder', "评论筛选关键词，空格分隔");
+            if (typeof keywords !== 'undefined' && keywords.length !== 0) {
+                inputKeywords.setAttribute('value', keywords);
+            } else {
+                inputKeywords.setAttribute('value', 'ToSsGirL 西湖 大哥 F91');
+            }
+            document.getElementById('douyin-header').appendChild(inputKeywords);
+
+            // 文本框，输入最大浏览视频数量
+            var inputMaxVideoNum = document.createElement("input");
+            inputMaxVideoNum.setAttribute('name', "inputMaxVideoNum");
+            inputMaxVideoNum.setAttribute('type', "number");
+            inputMaxVideoNum.setAttribute('min', "0");
+            inputMaxVideoNum.setAttribute('step', "1");
+            inputMaxVideoNum.setAttribute('placeholder', "最大浏览视频数量，数字");
+            if (typeof maxVideoNum !== 'undefined' && maxVideoNum.length !== 0) {
+                inputMaxVideoNum.setAttribute('value', maxVideoNum);
+            } else {
+                inputMaxVideoNum.setAttribute('value', '10');
+            }
+            inputMaxVideoNum.addEventListener('mouseup', (e) => {
+                e.stopPropagation();
+            });
+            document.getElementById('douyin-header').appendChild(inputMaxVideoNum);
+
+            // 按钮，控制"开始筛选评论"行为，这是最主要的功能
+            var btnStart = document.createElement("button");
+            btnStart.innerHTML = "开始筛选评论";
+            // 点击按钮后...
+            btnStart.onclick = function () {
+                // 保存用户输入至Cookie
+                // TODO: 没有检测用户输入合法性
+                target = inputTarget.value;
+                Cookies.set('target', String(target), { domain: DOMAIN, expires: 1 });
+                keywords = inputKeywords.value;
+                Cookies.set('keywords', String(keywords), { domain: DOMAIN, expires: 1 });
+                maxVideoNum = inputMaxVideoNum.value;
+                Cookies.set('maxVideoNum', String(maxVideoNum), { domain: DOMAIN, expires: 1 });
+
+                // 重定向至视频搜索结果页面，页面自动刷新后进入下一个状态
+                console.log("正在根据关键词搜索视频...");
+                Cookies.set('State', String(State.One), { domain: DOMAIN, expires: 1 });
+                curState = State.One;
+                var searchUrl = encodeURI(strFormat('https://%s/search/%s?&type=video', DOMAIN, target));
+                window.location.href = searchUrl;
+            };
+            document.getElementById('douyin-header').appendChild(btnStart);
+
+            // 按钮，手动删除和脚本相关的Cookie文件
+            var btnRmCookie = document.createElement("button");
+            btnRmCookie.innerHTML = "清除脚本缓存";
+            // 点击按钮后...
+            btnRmCookie.onclick = function () {
+                console.log("正在清除脚本相关的Cookie文件...");
+                Cookies.remove('target', { path: '', domain: DOMAIN });
+                Cookies.remove('keywords', { path: '', domain: DOMAIN });
+                Cookies.remove('maxVideoNum', { path: '', domain: DOMAIN });
+                Cookies.remove('State', { path: '', domain: DOMAIN });
+                Cookies.remove('videoIdArr', { path: '', domain: DOMAIN });
+                Cookies.remove('videoCurIndex', { path: '', domain: DOMAIN });
+                Cookies.remove('Result', { path: '', domain: DOMAIN });
+                console.log("清除完成，用户刷新后将重新运行脚本");
+            };
+            document.getElementById('douyin-header').appendChild(btnRmCookie);
             break;
 
         // 状态一。获取关键词对应的所有视频编号
@@ -155,7 +243,7 @@
                 // 去除重复的视频编号
                 videoIdArr = [...new Set(videoIdArr)];
                 // 用户希望选择前多少个视频
-                console.assert(MAX_VIDEO_NUM >= 0, 'MAX_VIDEO_NUM应当是非负整数，否则可能会获取不到视频编号');
+                console.assert(MAX_VIDEO_NUM >= 0, '最大筛选视频数量应当是非负整数，否则可能会获取不到视频编号');
                 videoIdArr = videoIdArr.slice(
                     0, Math.min(videoIdArr.length, Math.floor(MAX_VIDEO_NUM)));
 
@@ -172,8 +260,8 @@
                     const videoUrl = strFormat('https://%s/video/%s', DOMAIN, videoIdArr[0]);
                     window.location.href = videoUrl;
                 } else {
-                    // 出错，下次刷新后返回初态
-                    console.log('没有获取到任何有效的视频编号，刷新后将重新运行脚本');
+                    // 出错，下次用户刷新后返回初态
+                    console.log('没有获取到任何有效的视频编号，用户刷新后将重新运行脚本');
                     Cookies.set('State', String(State.Original), { domain: DOMAIN, expires: 1 });
                     curState = State.Original;
                 }
@@ -197,7 +285,7 @@
                     let result = mainLogic(body, KEYWORDS);
                     console.log('本视频页面分析完成，结果为：')
                     console.log(result);
-                    // 添加结果至缓存，若是从头开始运行则覆盖老的缓存
+                    // 添加结果至Cookie，若是从头开始运行则覆盖老的Cookie
                     let oldResult = Cookies.get('Result');
                     if (typeof oldResult !== 'undefined' && videoCurIndex !== 0) {
                         result = oldResult + result;
@@ -216,28 +304,28 @@
                         const videoUrl = strFormat('https://%s/video/%s', DOMAIN, videoId);
                         window.location.href = videoUrl;
                     } else {
-                        // 执行完毕正常退出，下次刷新后返回初态
+                        // 执行完毕正常退出，下次用户刷新后返回初态
                         let finMsg = strFormat(
                             '【视频主题】\n%s\n【评论关键词】\n%s\n【最终筛选结果】\n%s\n',
                             TARGET, KEYWORDS, result);
                         console.log(finMsg);
                         download(result, 'Result', 'text/plain');
 
-                        console.log('脚本运行完成，注意结果文件下载弹窗。刷新后将重新运行脚本');
+                        console.log('脚本运行完成，注意结果文件下载弹窗。用户刷新后将重新运行脚本');
                         Cookies.set('State', String(State.Original), { domain: DOMAIN, expires: 1 });
                         curState = State.Original;
                     }
                 }
             } else {
-                // 出错，下次刷新后返回初态
-                console.log('没有找到视频编号缓存文件，刷新后将重新运行脚本');
+                // 出错，下次用户刷新后返回初态
+                console.log('没有找到视频编号的Cookie缓存文件，用户刷新后将重新运行脚本');
                 Cookies.set('State', String(State.Original), { domain: DOMAIN, expires: 1 });
                 curState = State.Original;
             }
             break;
     }
 
-    console.log('页面如果长时间没有自动跳转，脚本可能已经停止运行\n'
-        + '可以尝试刷新页面，或删除Cookie后再刷新页面，脚本可能恢复运行');
+    console.log('除了填写信息的页面外，页面如果长时间没有自动跳转，脚本可能已经停止运行\n'
+        + '可以尝试刷新页面，脚本可能恢复运行。仍不行请删除浏览器上该网站的Cookie，刷新后脚本将重置。');
 
 })();
