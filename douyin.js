@@ -146,7 +146,7 @@
             console.log("正在获取关键词对应的所有视频编号...");
             // setTimeout等待几秒，以确保网页真的已经完成加载
             // TODO: 为什么onload被触发时页面却没有加载完全？反爬虫机制？
-            console.log("确保页面真的完全加载，请等待...");
+            console.log("确保页面真的完全加载，请等待几秒...");
             window.onload = setTimeout(function () {
                 const bodyText = document.getElementsByTagName("body")[0].innerHTML;
                 const rgx = new RegExp(
@@ -237,6 +237,7 @@
             break;
     }
 
-    console.log('脚本运行结束');
+    console.log('页面如果长时间没有自动跳转，脚本可能已经停止运行\n'
+        + '可以尝试刷新页面，或删除Cookie后再刷新页面，脚本可能恢复运行');
 
 })();
