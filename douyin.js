@@ -217,13 +217,13 @@
             // 点击按钮后...
             btnRmCookie.onclick = function () {
                 console.log("正在清除脚本相关的Cookie文件...");
-                Cookies.remove('target', { path: '', domain: DOMAIN });
-                Cookies.remove('keywords', { path: '', domain: DOMAIN });
-                Cookies.remove('maxVideoNum', { path: '', domain: DOMAIN });
-                Cookies.remove('State', { path: '', domain: DOMAIN });
-                Cookies.remove('videoIdArr', { path: '', domain: DOMAIN });
-                Cookies.remove('videoCurIndex', { path: '', domain: DOMAIN });
-                Cookies.remove('Result', { path: '', domain: DOMAIN });
+                Cookies.remove('target', { domain: DOMAIN });
+                Cookies.remove('keywords', { domain: DOMAIN });
+                Cookies.remove('maxVideoNum', { domain: DOMAIN });
+                Cookies.remove('State', { domain: DOMAIN });
+                Cookies.remove('videoIdArr', { domain: DOMAIN });
+                Cookies.remove('videoCurIndex', { domain: DOMAIN });
+                Cookies.remove('Result', { domain: DOMAIN });
                 console.log("清除完成，用户刷新后将重新运行脚本");
             };
             document.getElementById('douyin-header').appendChild(btnRmCookie);
