@@ -79,6 +79,8 @@
 
         let videoIdArr;
         for (let videoNum = 0; videoNum < maxVideoNum;) {
+            console.log(strFormat(
+                '正在获取视频链接：%s / %s', videoNum + 1, maxVideoNum));
             window.scrollTo(0, document.body.scrollHeight);
             videoIdArr = await getVideoAfterDelay(body, regex);
             videoIdArr = [...new Set(videoIdArr)]; // 去除重复的视频编号
@@ -132,8 +134,12 @@
             let keywordsInComment = keywords.filter(
                 k => comments[i].toLowerCase().includes(k.toLowerCase()));
             if (keywordsInComment.length > 0) {
-                result += strFormat(
-                    '%s\t%s\t%s\t%s\n', keywordsInComment, users[i], comments[i], url);
+                result += strFormat('%s\t%s\t%s\t%s\n',
+                    keywordsInComment,
+                    users[i],
+                    comments[i].replaceAll('\n', ' '),
+                    url
+                );
             }
         }
         return result;
