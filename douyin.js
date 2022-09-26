@@ -7,7 +7,6 @@
 // @match        https://www.douyin.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=google.com
 // @grant        none
-// @require      none
 // @license      GPLv2且禁止商用 | GPLv2 AND Commercial use prohibited
 // ==/UserScript==
 
