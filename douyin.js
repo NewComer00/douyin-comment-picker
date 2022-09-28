@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音评论筛选器 | Douyin Comment Picker
 // @namespace    https://github.com/NewComer00
-// @version      0.3.0
+// @version      0.3.1
 // @description  筛选搜索包含给定关键词的抖音评论 | Pick out the comments including the given keywords in Douyin.
 // @author       NewComer00
 // @match        https://www.douyin.com/*
@@ -17,11 +17,16 @@
     // 使用说明
     //
     // 将脚本复制添加到Tampermonkey。使能该脚本，然后访问抖音官网，按下F12进入Console即可。
-    // 在页面上方依次填写“视频关键词”“评论筛选关键词（空格隔开）”和“最大浏览视频数量”，然后点击“开始”。
-    // 脚本运行中如被打断，刷新即可继续运行。脚本的中间结果会保存在浏览器的本地缓存文件中，随时可以再次从断点开始。
-    // 如中途需要从头执行脚本，请先删除浏览器上抖音网站的浏览缓存数据，然后刷新抖音页面即可。
+    // 在页面上方依次填写“视频关键词”、“评论筛选关键词（空格隔开）”和“最大浏览视频数量”，然后点击“开始”。
+    //
+    // 脚本的中间结果会保存在浏览器的本地缓存文件中，随时可以再次从断点开始。
+    // 脚本运行中如被打断，刷新即可继续运行；若标签页或浏览器被关闭，打开任何抖音网站即可从断点继续运行脚本。
+    //
+    // 如中途需要从头执行脚本，请先删除浏览器上抖音网站的浏览缓存数据，然后刷新抖音页面即可。此为通用方法，但会使抖音账号登出。
+    // 对于0.3版本，也可在Console中执行localStorage.removeItem('State')命令，然后刷新网页即可重置脚本。此方法可保留抖音的登录状态。
+    // 如需在脚本运行前排除先前浏览缓存数据的影响，可以点击“清除脚本缓存”按钮，清除缓存文件后页面会自动刷新。
+    //
     // 执行完毕后，网页会弹出结果文件下载窗口。复制文件中所有内容，粘贴到Excel即可以表格方式查看。
-    // 如需在脚本运行前排除先前浏览缓存数据的影响，可以点击“清除脚本缓存”按钮，然后刷新页面。
     // ========================================================================
 
     // ========================================================================
@@ -162,8 +167,8 @@
     if (target === null || keywords === null || maxVideoNum === null) {
         // 除非当前状态在初态，否则这些缓存文件都应当存在。不存在则回到初态
         if (curState !== State.Original) {
-            console.log('没有找到视频关键词和评论关键词等的本地缓存文件\n'
-                + '脚本将重置进度，请重新输入这些信息');
+            console.log('没有找到视频关键词和评论关键词等的本地缓存文件\n' +
+                '脚本将重置进度，请重新输入这些信息');
             localStorage.setItem('State', State.Original);
             curState = State.Original;
         }
@@ -257,7 +262,9 @@
                 localStorage.removeItem('videoIdArr');
                 localStorage.removeItem('videoCurIndex');
                 localStorage.removeItem('Result');
-                console.log("清除完成，用户刷新后将重新运行脚本");
+
+                console.log("清除完成，页面即将刷新...");
+                window.location.reload();
             };
             document.getElementById('douyin-header').appendChild(btnRmLocalStorage);
             break;
@@ -296,7 +303,6 @@
                     curState = State.Two;
 
                     // 重定向至第0号视频页面，下次脚本应当进入下一个状态
-                    // TODO: 和下一种状态耦合
                     const videoUrl = strFormat('https://%s/video/%s', DOMAIN, videoIdArr[0]);
                     window.location.href = videoUrl;
                 } else {
@@ -314,8 +320,12 @@
             var videoIdArr = localStorage.getItem('videoIdArr').split(",");
             var videoCurIndex = parseInt(localStorage.getItem('videoCurIndex'));
             if (videoIdArr !== null && !isNaN(videoCurIndex)) {
-                // 从上一个状态进来后，应当默认位于第0号视频处
-                // TODO: 和上一种状态耦合
+                // 如果当前页面不在正确的地址，跳转至准备处理的视频地址
+                const videoUrl = strFormat('https://%s/video/%s', DOMAIN, videoIdArr[videoCurIndex]);
+                if (window.location.href !== videoUrl) {
+                    window.location.href = videoUrl;
+                }
+
                 console.log(strFormat(
                     "处理进度：%s / %s", videoCurIndex + 1, videoIdArr.length));
                 var videoId = videoIdArr[videoCurIndex];
@@ -367,7 +377,7 @@
             break;
     }
 
-    console.log('除了填写信息的页面外，页面如果长时间没有自动跳转，脚本可能已经停止运行\n'
-        + '可以尝试刷新页面，脚本可能恢复运行。仍不行请删除浏览器上该网站的浏览缓存数据，刷新后脚本将重置。');
+    console.log('除了填写信息的页面外，页面如果长时间没有自动跳转，脚本可能已经停止运行\n' +
+        '可以尝试刷新页面，脚本可能恢复运行。仍不行请删除浏览器上该网站的浏览缓存数据，刷新后脚本将重置。');
 
 })();
