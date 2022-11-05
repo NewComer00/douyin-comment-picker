@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音评论筛选器 | Douyin Comment Picker
 // @namespace    https://github.com/NewComer00
-// @version      0.3.1
+// @version      0.4.0
 // @description  筛选搜索包含给定关键词的抖音评论 | Pick out the comments including the given keywords in Douyin.
 // @author       NewComer00
 // @match        https://www.douyin.com/*
@@ -110,28 +110,30 @@
             return a;
         }
 
-        // 视频页面上，所有带用户名和评论的节点大概长这样
-        let nodeList = body.getElementsByClassName(
-            "comment-mainContent")[0].getElementsByClassName('notranslate new-pmd');
+        // 获取视频页面评论区的总节点
+        let commentMainContent = body.getElementsByClassName("comment-mainContent")[0];
+        // 拼接评论区总节点中所有含文本节点的文字，拼接为字符串
+        let allText = textNodesUnder(commentMainContent).map(_ => _.data).join('');
 
-        // 拼接nodeList中所有含文本节点的文字，拼接为字符串后放入textList中
-        // 正确获取的textList中，从0开始偶数下标存放用户名，奇数存放其评论
-        let textList = [];
-        for (let node of nodeList) {
-            textList.push(textNodesUnder(node).map(_ => _.data).join(''));
+        // ========================================================================
+        // 提取每条评论内容的正则表达式，可以自定义
+        let re = /(.+?)(\d{4}\.\d{2}\.\d{2})(?:作者)?\.{3}(.+?)(\d+(\.\d+)?\w?)回复(?:展开\d+条回复)?/g;
+        let users = []; // 上述正则表达式的第一个匹配位置为用户名，以下依此类推
+        let dates = []; // 评论日期
+        let comments = []; // 评论内容
+        let replyNums = []; // 评论下的回复数量
+        // ========================================================================
+
+        let match;
+        while (match = re.exec(allText)) {
+            users.push(match[1]);
+            dates.push(match[2]);
+            comments.push(match[3]);
+            replyNums.push(match[4]);
         }
-        console.assert(textList.length % 2 === 0,
-            'textList长度是奇数。长度应当是偶数，评论获取可能出错');
-
-        console.log('获取到所有用户名及其评论如下：');
-        console.log(textList);
-
-        // 分离用户名和评论
-        let users = textList.filter((v, i) => (i % 2) === 0);
-        let comments = textList.filter((v, i) => (i % 2) === 1);
 
         // result存放检测到符合关键词要求的信息，每行格式如下：
-        // 检测到的关键词\t发评论的用户\t评论内容\t视频页面链接\n
+        // 检测到的关键词\t发评论的用户\t评论内容\t回复数量\t评论日期\t视频页面链接\n
         let result = '';
         let url = window.location.href;
         for (let i = 0; i < comments.length; i++) {
@@ -139,10 +141,12 @@
             let keywordsInComment = keywords.filter(
                 k => comments[i].toLowerCase().includes(k.toLowerCase()));
             if (keywordsInComment.length > 0) {
-                result += strFormat('%s\t%s\t%s\t%s\n',
+                result += strFormat('%s\t%s\t%s\t%s\t%s\t%s\n',
                     keywordsInComment,
                     users[i],
                     comments[i].replaceAll('\n', ' '),
+                    replyNums[i],
+                    dates[i],
                     url
                 );
             }
@@ -357,6 +361,8 @@
                         window.location.href = videoUrl;
                     } else {
                         // 执行完毕正常退出，下次用户刷新后返回初态
+                        let resultTitle = '关键词\t评论用户\t评论内容\t回复数量\t评论日期\t视频链接\n';
+                        result = resultTitle + result;
                         let finMsg = strFormat(
                             '【视频主题】\n%s\n【评论关键词】\n%s\n【最终筛选结果】\n%s\n',
                             TARGET, KEYWORDS, result);
