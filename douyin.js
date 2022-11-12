@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音评论筛选器 | Douyin Comment Picker
 // @namespace    https://github.com/NewComer00
-// @version      0.5.0
+// @version      0.5.1
 // @description  筛选搜索包含给定关键词的抖音评论 | Pick out the comments including the given keywords in Douyin.
 // @author       NewComer00
 // @match        https://www.douyin.com/*
@@ -158,7 +158,7 @@
         }
 
         // result存放检测到符合关键词要求的信息，每行格式如下：
-        // 检测到的关键词\t发评论的用户\t评论内容\t回复数量\t评论日期\t视频页面链接\n
+        // 检测到的关键词\t评论相关信息...\t视频页面链接\n
         let result = '';
         let url = window.location.href;
         for (const comment of commentList) {
