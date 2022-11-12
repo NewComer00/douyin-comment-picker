@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音评论筛选器 | Douyin Comment Picker
 // @namespace    https://github.com/NewComer00
-// @version      0.4.0
+// @version      0.5.0
 // @description  筛选搜索包含给定关键词的抖音评论 | Pick out the comments including the given keywords in Douyin.
 // @author       NewComer00
 // @match        https://www.douyin.com/*
@@ -23,7 +23,7 @@
     // 脚本运行中如被打断，刷新即可继续运行；若标签页或浏览器被关闭，打开任何抖音网站即可从断点继续运行脚本。
     //
     // 如中途需要从头执行脚本，请先删除浏览器上抖音网站的浏览缓存数据，然后刷新抖音页面即可。此为通用方法，但会使抖音账号登出。
-    // 对于0.3版本，也可在Console中执行localStorage.removeItem('State')命令，然后刷新网页即可重置脚本。此方法可保留抖音的登录状态。
+    // 对于0.3及以上版本，也可在Console中执行localStorage.removeItem('State')命令，然后刷新网页即可重置脚本。此方法可保留抖音的登录状态。
     // 如需在脚本运行前排除先前浏览缓存数据的影响，可以点击“清除脚本缓存”按钮，清除缓存文件后页面会自动刷新。
     //
     // 执行完毕后，网页会弹出结果文件下载窗口。复制文件中所有内容，粘贴到Excel即可以表格方式查看。
@@ -102,53 +102,93 @@
     // 分析视频页面的逻辑，可以自定义
     // ========================================================================
     function mainLogic(body, keywords) {
-        // 获取HTML某节点下属所有的含文本节点
+        // 获取HTML某节点下属所有不为空的含文本节点
         // https://stackoverflow.com/a/10730777
         function textNodesUnder(el) {
             var n, a = [], walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
-            while (n = walk.nextNode()) a.push(n);
+            while (n = walk.nextNode()) {
+                if (n.data.length > 0) a.push(n);
+            }
             return a;
+        }
+
+        // 获取某节点的相对深度
+        // https://stackoverflow.com/a/45223847/15283141
+        function getElementDepth(element) {
+            function getElementDepthRec(element, depth) {
+    	        if(element.parentNode==null) return depth;
+                else return getElementDepthRec(element.parentNode, depth+1);
+            }
+            return getElementDepthRec(element, 0);
         }
 
         // 获取视频页面评论区的总节点
         let commentMainContent = body.getElementsByClassName("comment-mainContent")[0];
-        // 拼接评论区总节点中所有含文本节点的文字，拼接为字符串
-        let allText = textNodesUnder(commentMainContent).map(_ => _.data).join('');
+        // 提取评论区总节点中所有含文本的节点
+        let textNodes = textNodesUnder(commentMainContent);
+        // 假设首节点就是每个评论的开头。计算每个文字节点的相对深度，根据首节点的深度来切分不同评论
+        let nodeDepths = textNodes.map(_ => getElementDepth(_));
+        // 所有与首节点深度相同节点的idx
+        let commentIdxList = nodeDepths.map(
+            (depth,idx) => {if(depth === nodeDepths[0]) return idx;}).filter(idx => idx !== undefined);
 
-        // ========================================================================
-        // 提取每条评论内容的正则表达式，可以自定义
-        let re = /(.+?)(\d{4}\.\d{2}\.\d{2})(?:作者)?\.{3}(.+?)(\d+(\.\d+)?\w?)回复(?:展开\d+条回复)?/g;
-        let users = []; // 上述正则表达式的第一个匹配位置为用户名，以下依此类推
-        let dates = []; // 评论日期
-        let comments = []; // 评论内容
-        let replyNums = []; // 评论下的回复数量
-        // ========================================================================
+        // 提取评论列表
+        let commentList = [];
+        for (let i = 0; i < commentIdxList.length; i++) {
+            // 截取每个评论的所有相关节点
+            let startIdx = commentIdxList[i];
+            let endIdx = (i !== commentIdxList.length - 1) ? commentIdxList[i+1] : textNodes.length;
 
-        let match;
-        while (match = re.exec(allText)) {
-            users.push(match[1]);
-            dates.push(match[2]);
-            comments.push(match[3]);
-            replyNums.push(match[4]);
+            // 在每个评论相关的所有节点中，拼接“相邻深度接近的节点”的内容
+            let diffThreshold = 1; // 深度相差多少算“接近”
+            let curComment = [];
+            let tmpStr = textNodes[startIdx].data;
+            for (let j = startIdx; j < endIdx - 1; j++) {
+                if (Math.abs(nodeDepths[j] - nodeDepths[j+1]) <= diffThreshold) {
+                    tmpStr += textNodes[j+1].data;
+                } else {
+                    curComment.push(tmpStr);
+                    tmpStr = textNodes[j+1].data;
+                }
+            }
+            curComment.push(tmpStr);
+
+            // 当前评论加入评论列表
+            commentList.push(curComment);
         }
 
         // result存放检测到符合关键词要求的信息，每行格式如下：
         // 检测到的关键词\t发评论的用户\t评论内容\t回复数量\t评论日期\t视频页面链接\n
         let result = '';
         let url = window.location.href;
-        for (let i = 0; i < comments.length; i++) {
-            // 第i条评论中包含了哪些关键词
-            let keywordsInComment = keywords.filter(
-                k => comments[i].toLowerCase().includes(k.toLowerCase()));
-            if (keywordsInComment.length > 0) {
-                result += strFormat('%s\t%s\t%s\t%s\t%s\t%s\n',
-                    keywordsInComment,
-                    users[i],
-                    comments[i].replaceAll('\n', ' '),
-                    replyNums[i],
-                    dates[i],
-                    url
-                );
+        for (const comment of commentList) {
+            // 每条评论中包含了哪些关键词，假设每条评论的首个元素是用户名，用户名含关键词不算
+            for (let i = 1; i < comment.length; i++) {
+                let keywordsInComment = keywords.filter(
+                    k => comment[i].toLowerCase().includes(k.toLowerCase()));
+                // 如果在评论中找到了含有关键词的元素
+                if (keywordsInComment.length > 0) {
+                    // 先将评论列表格式化为字符串
+                    let commentStr = comment.reduce((acc, elem) => {
+                        // 删除“展开更多选项”的元素
+                        if (elem === '...') {
+                            return acc;
+                        } else {
+                            // 用空格代替换行符
+                            let tmpStr = elem.replaceAll('\n', '');
+                            return acc + tmpStr + '\t';
+                        }
+                    }, '');
+                    commentStr = commentStr.trim();
+
+                    // 将提取出的信息加入结果
+                    result += strFormat('%s\t%s\t%s\n',
+                                        keywordsInComment,
+                                        commentStr,
+                                        url
+                                       );
+                    break;
+                }
             }
         }
         return result;
@@ -361,8 +401,6 @@
                         window.location.href = videoUrl;
                     } else {
                         // 执行完毕正常退出，下次用户刷新后返回初态
-                        let resultTitle = '关键词\t评论用户\t评论内容\t回复数量\t评论日期\t视频链接\n';
-                        result = resultTitle + result;
                         let finMsg = strFormat(
                             '【视频主题】\n%s\n【评论关键词】\n%s\n【最终筛选结果】\n%s\n',
                             TARGET, KEYWORDS, result);
