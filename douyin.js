@@ -104,10 +104,15 @@
     function mainLogic(body, keywords) {
         // 获取HTML某节点下属所有不为空的含文本节点
         // https://stackoverflow.com/a/10730777
+        // 加上了用户 url的提取
         function textNodesUnder(el) {
-            var n, a = [], walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+            var n, a = [], walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, null, false);
             while (n = walk.nextNode()) {
-                if (n.data.length > 0) a.push(n);
+                if (n.nodeType === Node.TEXT_NODE && n.data.length > 0) {
+                    a.push(n);
+                } else if (n.nodeType === Node.ELEMENT_NODE && n.tagName === 'A' && n.href && n.href.includes('/user/') && !a.includes(n.href)) {
+                    a.push(n);
+                }
             }
             return a;
         }
@@ -121,7 +126,6 @@
             }
             return getElementDepthRec(element, 0);
         }
-
         // 获取视频页面评论区的总节点
         let commentMainContent = body.getElementsByClassName("comment-mainContent")[0];
         // 提取评论区总节点中所有含文本的节点
@@ -143,12 +147,26 @@
             let diffThreshold = 1; // 深度相差多少算“接近”
             let curComment = [];
             let tmpStr = textNodes[startIdx].data;
+            if (textNodes[startIdx].data) {
+                tmpStr = textNodes[startIdx].data;
+            }
+            else if(textNodes[startIdx].href) {
+                tmpStr = textNodes[startIdx].href;   
+            }
             for (let j = startIdx; j < endIdx - 1; j++) {
                 if (Math.abs(nodeDepths[j] - nodeDepths[j+1]) <= diffThreshold) {
-                    tmpStr += textNodes[j+1].data;
+                    if (textNodes[j+1].data) {
+                        tmpStr += textNodes[j+1].data;
+                    } else if (textNodes[j+1].href) {
+                        tmpStr += textNodes[j+1].href;
+                    }
                 } else {
                     curComment.push(tmpStr);
-                    tmpStr = textNodes[j+1].data;
+                    if (textNodes[j+1].data) {
+                        tmpStr = textNodes[j + 1].data;
+                    } else if (textNodes[j+1].href) {
+                        tmpStr = textNodes[j+1].href;
+                    }
                 }
             }
             curComment.push(tmpStr);
