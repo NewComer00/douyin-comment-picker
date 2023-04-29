@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音评论筛选器 | Douyin Comment Picker
 // @namespace    https://github.com/NewComer00
-// @version      0.5.1
+// @version      0.5.2
 // @description  筛选搜索包含给定关键词的抖音评论 | Pick out the comments including the given keywords in Douyin.
 // @author       NewComer00
 // @match        https://www.douyin.com/*
@@ -366,7 +366,9 @@
             if (videoIdArr !== null && !isNaN(videoCurIndex)) {
                 // 如果当前页面不在正确的地址，跳转至准备处理的视频地址
                 const videoUrl = strFormat('https://%s/video/%s', DOMAIN, videoIdArr[videoCurIndex]);
-                if (window.location.href !== videoUrl) {
+                // 抖音的图文笔记可能会伪装成视频，我们也兼容搜索图文笔记
+                const noteUrl = strFormat('https://%s/note/%s', DOMAIN, videoIdArr[videoCurIndex]);
+                if (window.location.href !== videoUrl && window.location.href !== noteUrl) {
                     window.location.href = videoUrl;
                 }
 
