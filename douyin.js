@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音评论筛选器 | Douyin Comment Picker
 // @namespace    https://github.com/NewComer00
-// @version      0.5.2
+// @version      0.6.0
 // @description  筛选搜索包含给定关键词的抖音评论 | Pick out the comments including the given keywords in Douyin.
 // @author       NewComer00
 // @match        https://www.douyin.com/*
@@ -16,7 +16,7 @@
     // ========================================================================
     // 使用说明
     //
-    // 将脚本复制添加到Tampermonkey。使能该脚本，然后访问抖音官网，按下F12进入Console即可。
+    // 将脚本复制添加到Tampermonkey。使能该脚本，然后访问抖音官网https://www.douyin.com/，按下F12进入Console即可。
     // 在页面上方依次填写“视频关键词”、“评论筛选关键词（空格隔开）”和“最大浏览视频数量”，然后点击“开始”。
     //
     // 脚本的中间结果会保存在浏览器的本地缓存文件中，随时可以再次从断点开始。
@@ -122,6 +122,20 @@
             return getElementDepthRec(element, 0);
         }
 
+        // 递归搜索node的父母节点，直到遇到href中包含substr的节点，返回该节点的href字符串
+        // 若未找到符合要求的href，则返回null
+        // https://stackoverflow.com/a/29412162
+        function getNearestAncestorHref(node, substr){
+            while(node !== null) {
+                if (typeof node.href !== "undefined" && node.href.includes(substr)) {
+                    return node.href;
+                } else {
+                    node = node.parentNode;
+                }
+            }
+            return null;
+        }
+
         // 获取视频页面评论区的总节点
         let commentMainContent = body.getElementsByClassName("comment-mainContent")[0];
         // 提取评论区总节点中所有含文本的节点
@@ -134,6 +148,7 @@
 
         // 提取评论列表
         let commentList = [];
+        const USER_URL_PREFIX = strFormat('%s/user/', DOMAIN);
         for (let i = 0; i < commentIdxList.length; i++) {
             // 截取每个评论的所有相关节点
             let startIdx = commentIdxList[i];
@@ -153,14 +168,18 @@
             }
             curComment.push(tmpStr);
 
+            // 获取并存储当前评论所属的视频链接与用户主页链接
+            curComment.videoUrl = window.location.href;
+            curComment.userUrl = getNearestAncestorHref(textNodes[startIdx], USER_URL_PREFIX);
+            curComment.userUrl = (curComment.userUrl === null) ? '' : curComment.userUrl;
+
             // 当前评论加入评论列表
             commentList.push(curComment);
         }
 
         // result存放检测到符合关键词要求的信息，每行格式如下：
-        // 检测到的关键词\t评论相关信息...\t视频页面链接\n
+        // 检测到的关键词\t评论相关信息...\t视频页面链接\t用户主页链接\n
         let result = '';
-        let url = window.location.href;
         for (const comment of commentList) {
             // 每条评论中包含了哪些关键词，假设每条评论的首个元素是用户名，用户名含关键词不算
             for (let i = 1; i < comment.length; i++) {
@@ -182,10 +201,11 @@
                     commentStr = commentStr.trim();
 
                     // 将提取出的信息加入结果
-                    result += strFormat('%s\t%s\t%s\n',
+                    result += strFormat('%s\t%s\t%s\t%s\n',
                                         keywordsInComment,
                                         commentStr,
-                                        url
+                                        comment.videoUrl,
+                                        comment.userUrl,
                                        );
                     break;
                 }
@@ -376,7 +396,10 @@
                     "处理进度：%s / %s", videoCurIndex + 1, videoIdArr.length));
                 var videoId = videoIdArr[videoCurIndex];
                 console.log('进入视频：' + videoId);
-                window.onload = function () {
+
+                // setTimeout等待几秒，以确保网页真的已经完成加载
+                // TODO: 为什么onload被触发时页面却没有加载完全？反爬虫机制？
+                window.onload = setTimeout(async function () {
 
                     // 分析视频页面，核心处理逻辑
                     const body = document.getElementsByTagName("body")[0];
@@ -413,7 +436,8 @@
                         localStorage.setItem('State', String(State.Original));
                         curState = State.Original;
                     }
-                }
+                }, 5000);
+
             } else {
                 // 出错，下次用户刷新后返回初态
                 console.log('没有找到视频编号的缓存文件，用户刷新后将重新运行脚本');
