@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音评论筛选器 | Douyin Comment Picker
 // @namespace    https://github.com/NewComer00
-// @version      0.6.0
+// @version      0.6.1
 // @description  筛选搜索包含给定关键词的抖音评论 | Pick out the comments including the given keywords in Douyin.
 // @author       NewComer00
 // @match        https://www.douyin.com/*
@@ -46,13 +46,35 @@
         Two: 'Two'
     }
 
+    // 当给定元素被加载后，返回该元素对象
+    // https://stackoverflow.com/a/61511955/15283141
+    function waitForElm(selector) {
+        return new Promise(resolve => {
+            if (document.querySelector(selector)) {
+                return resolve(document.querySelector(selector));
+            }
+
+            const observer = new MutationObserver(mutations => {
+                if (document.querySelector(selector)) {
+                    resolve(document.querySelector(selector));
+                    observer.disconnect();
+                }
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        });
+    }
+
     // 下载数据至本地文件
     // https://stackoverflow.com/a/30832210
     function download(data, filename, type) {
         var file = new Blob([data], { type: type });
-        if (window.navigator.msSaveOrOpenBlob) // IE10+
+        if (window.navigator.msSaveOrOpenBlob) { // IE10+
             window.navigator.msSaveOrOpenBlob(file, filename);
-        else { // Others
+        } else { // Others
             var a = document.createElement("a"),
                 url = URL.createObjectURL(file);
             a.href = url;
@@ -116,7 +138,7 @@
         // https://stackoverflow.com/a/45223847/15283141
         function getElementDepth(element) {
             function getElementDepthRec(element, depth) {
-    	        if(element.parentNode==null) return depth;
+                if(element.parentNode==null) return depth;
                 else return getElementDepthRec(element.parentNode, depth+1);
             }
             return getElementDepthRec(element, 0);
@@ -232,7 +254,7 @@
         // 除非当前状态在初态，否则这些缓存文件都应当存在。不存在则回到初态
         if (curState !== State.Original) {
             console.log('没有找到视频关键词和评论关键词等的本地缓存文件\n' +
-                '脚本将重置进度，请重新输入这些信息');
+                        '脚本将重置进度，请重新输入这些信息');
             localStorage.setItem('State', State.Original);
             curState = State.Original;
         }
@@ -249,6 +271,9 @@
         case State.Original:
             console.log("请在页面上填写相关筛选信息...");
 
+            // 交互组件容器，用于存放以下组件
+            var inputDiv = document.createElement("div");
+
             // 文本框，输入视频关键词
             var inputTarget = document.createElement("input");
             inputTarget.setAttribute('name', "inputTarget");
@@ -259,7 +284,7 @@
             } else {
                 inputTarget.setAttribute('value', '孙一峰');
             }
-            document.getElementById('douyin-header').appendChild(inputTarget);
+            inputDiv.appendChild(inputTarget);
 
             // 文本框，输入视频下的评论筛选关键词
             var inputKeywords = document.createElement("input");
@@ -271,7 +296,7 @@
             } else {
                 inputKeywords.setAttribute('value', 'ToSsGirL 西湖 大哥 F91');
             }
-            document.getElementById('douyin-header').appendChild(inputKeywords);
+            inputDiv.appendChild(inputKeywords);
 
             // 文本框，输入最大浏览视频数量
             var inputMaxVideoNum = document.createElement("input");
@@ -288,7 +313,7 @@
             inputMaxVideoNum.addEventListener('mouseup', (e) => {
                 e.stopPropagation();
             });
-            document.getElementById('douyin-header').appendChild(inputMaxVideoNum);
+            inputDiv.appendChild(inputMaxVideoNum);
 
             // 按钮，控制"开始筛选评论"行为，这是最主要的功能
             var btnStart = document.createElement("button");
@@ -311,7 +336,7 @@
                 var searchUrl = encodeURI(strFormat('https://%s/search/%s?&type=video', DOMAIN, target));
                 window.location.href = searchUrl;
             };
-            document.getElementById('douyin-header').appendChild(btnStart);
+            inputDiv.appendChild(btnStart);
 
             // 按钮，手动删除和脚本相关的本地缓存文件
             var btnRmLocalStorage = document.createElement("button");
@@ -330,7 +355,14 @@
                 console.log("清除完成，页面即将刷新...");
                 window.location.reload();
             };
-            document.getElementById('douyin-header').appendChild(btnRmLocalStorage);
+            inputDiv.appendChild(btnRmLocalStorage);
+
+            // setTimeout等待几秒，以确保网页真的已经完成加载
+            // TODO: 为什么onload被触发时页面却没有加载完全？反爬虫机制？
+            window.onload = setTimeout(async function() {
+                // 添加交互菜单到页面悬浮标题栏下方
+                document.getElementById('douyin-header').appendChild(inputDiv);
+            }, 5000);
             break;
 
         // 状态一。获取关键词对应的所有视频编号
@@ -448,6 +480,6 @@
     }
 
     console.log('除了填写信息的页面外，页面如果长时间没有自动跳转，脚本可能已经停止运行\n' +
-        '可以尝试刷新页面，脚本可能恢复运行。仍不行请删除浏览器上该网站的浏览缓存数据，刷新后脚本将重置。');
+                '可以尝试刷新页面，脚本可能恢复运行。仍不行请删除浏览器上该网站的浏览缓存数据，刷新后脚本将重置。');
 
 })();
